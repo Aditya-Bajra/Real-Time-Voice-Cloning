@@ -7,6 +7,7 @@ from encoder.params_model import *
 from encoder.visualizations import Visualizations
 from utils.profiler import Profiler
 
+l2_lambda = 0.001
 
 def sync(device: torch.device):
     # For correct profiling (cuda operations are async)
@@ -59,7 +60,7 @@ def train(run_id: str, clean_data_root: Path, models_dir: Path, umap_every: int,
 
     # Create the model and the optimizer
     model = SpeakerEncoder(device, loss_device)
-    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate_init)
+    optimizer = torch.optim.Adam(model.parameters(), lr=learning_rate_init, weight_decay=l2_lambda)
     init_step = 1
 
     # Configure file path for the model
