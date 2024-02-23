@@ -105,31 +105,37 @@ class SpeakerEncoder(nn.Module):
         return sim_matrix
     
     def loss(self, embeds):
-        """
-        Computes the softmax loss according the section 2.1 of GE2E.
-        
-        :param embeds: the embeddings as a tensor of shape (speakers_per_batch, 
-        utterances_per_speaker, embedding_size)
-        :return: the loss and the EER for this batch of embeddings.
-        """
-        speakers_per_batch, utterances_per_speaker = embeds.shape[:2]
-        
-        # Loss
-        sim_matrix = self.similarity_matrix(embeds)
-        sim_matrix = sim_matrix.reshape((speakers_per_batch * utterances_per_speaker, 
-                                         speakers_per_batch))
-        ground_truth = np.repeat(np.arange(speakers_per_batch), utterances_per_speaker)
-        target = torch.from_numpy(ground_truth).long().to(self.loss_device)
-        loss = self.loss_fn(sim_matrix, target)
-        
-        # EER (not backpropagated)
-        with torch.no_grad():
-            inv_argmax = lambda i: np.eye(1, speakers_per_batch, i, dtype=np.int)[0]
-            labels = np.array([inv_argmax(i) for i in ground_truth])
-            preds = sim_matrix.detach().cpu().numpy()
+    """
+    Computes the softmax loss according the section 2.1 of GE2E.
 
-            # Snippet from https://yangcha.github.io/EER-ROC/
-            fpr, tpr, thresholds = roc_curve(labels.flatten(), preds.flatten())           
-            eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
-            
-        return loss, eer
+    :param embeds: the embeddings as a tensor of shape (speakers_per_batch,
+    utterances_per_speaker, embedding_size)
+    :return: the loss and the EER for this batch of embeddings.
+    """
+    speakers_per_batch, utterances_per_speaker = embeds.shape[:2]
+
+    # Loss
+    sim_matrix = self.similarity_matrix(embeds)
+    sim_matrix = sim_matrix.reshape((speakers_per_batch * utterances_per_speaker,
+                                     speakers_per_batch))
+    ground_truth = np.repeat(np.arange(speakers_per_batch), utterances_per_speaker)
+    target = torch.from_numpy(ground_truth).long().to(self.loss_device)
+    loss = self.loss_fn(sim_matrix, target)
+
+    # L2 regularization
+    l2_reg = 0.0
+    for param in self.parameters():
+        l2_reg += torch.norm(param)**2
+    loss += l2_reg * l2_lambda  # l2_lambda is the regularization strength hyperparameter
+
+    # EER (not backpropagated)
+    with torch.no_grad():
+        inv_argmax = lambda i: np.eye(1, speakers_per_batch, i, dtype=np.int)[0]
+        labels = np.array([inv_argmax(i) for i in ground_truth])
+        preds = sim_matrix.detach().cpu().numpy()
+
+        # Snippet from https://yangcha.github.io/EER-ROC/
+        fpr, tpr, thresholds = roc_curve(labels.flatten(), preds.flatten())
+        eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
+
+    return loss, eer
