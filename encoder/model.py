@@ -111,7 +111,7 @@ class SpeakerEncoder(nn.Module):
         sim_matrix = sim_matrix * self.similarity_weight + self.similarity_bias
         return sim_matrix
     
-        def loss(self, embeds):
+    def loss(self, embeds):
         """
         Computes the softmax loss according the section 2.1 of GE2E.
         
