@@ -1,27 +1,34 @@
-from encoder.params_model import *
-from encoder.params_data import *
-from scipy.interpolate import interp1d
-from sklearn.metrics import roc_curve
-from torch.nn.utils import clip_grad_norm_
-from scipy.optimize import brentq
+import torch
 from torch import nn
 import numpy as np
-import torch
+from scipy.interpolate import interp1d
+from sklearn.metrics import roc_curve
+from scipy.optimize import brentq
+from torch.nn.utils import clip_grad_norm_
+
+from encoder.params_model import *
+from encoder.params_data import *
 
 
 class SpeakerEncoder(nn.Module):
-    def __init__(self, device, loss_device):
+    def __init__(self, device, loss_device, freeze_lstm=True):
         super().__init__()
         self.loss_device = loss_device
         
-        # Network defition
+        # Network definition
         self.lstm = nn.LSTM(input_size=mel_n_channels,
                             hidden_size=model_hidden_size, 
                             num_layers=model_num_layers, 
                             batch_first=True).to(device)
+        
+        # Freeze LSTM layer if specified
+        if freeze_lstm:
+            for param in self.lstm.parameters():
+                param.requires_grad = False
+        
         self.linear = nn.Linear(in_features=model_hidden_size, 
                                 out_features=model_embedding_size).to(device)
-        self.relu = torch.nn.ReLU().to(device)
+        self.relu = nn.ReLU().to(device)
         
         # Cosine similarity scaling (with fixed initial parameter values)
         self.similarity_weight = nn.Parameter(torch.tensor([10.])).to(loss_device)
@@ -105,31 +112,31 @@ class SpeakerEncoder(nn.Module):
         return sim_matrix
     
     def loss(self, embeds):
-        """
-        Computes the softmax loss according the section 2.1 of GE2E.
-        
-        :param embeds: the embeddings as a tensor of shape (speakers_per_batch, 
-        utterances_per_speaker, embedding_size)
-        :return: the loss and the EER for this batch of embeddings.
-        """
-        speakers_per_batch, utterances_per_speaker = embeds.shape[:2]
-        
-        # Loss
-        sim_matrix = self.similarity_matrix(embeds)
-        sim_matrix = sim_matrix.reshape((speakers_per_batch * utterances_per_speaker, 
-                                         speakers_per_batch))
-        ground_truth = np.repeat(np.arange(speakers_per_batch), utterances_per_speaker)
-        target = torch.from_numpy(ground_truth).long().to(self.loss_device)
-        loss = self.loss_fn(sim_matrix, target)
-        
-        # EER (not backpropagated)
-        with torch.no_grad():
-            inv_argmax = lambda i: np.eye(1, speakers_per_batch, i, dtype=np.int)[0]
-            labels = np.array([inv_argmax(i) for i in ground_truth])
-            preds = sim_matrix.detach().cpu().numpy()
+    """
+    Computes the softmax loss according the section 2.1 of GE2E.
+    
+    :param embeds: the embeddings as a tensor of shape (speakers_per_batch, 
+    utterances_per_speaker, embedding_size)
+    :return: the loss and the EER for this batch of embeddings.
+    """
+    speakers_per_batch, utterances_per_speaker = embeds.shape[:2]
+    
+    # Loss
+    sim_matrix = self.similarity_matrix(embeds)
+    sim_matrix = sim_matrix.reshape((speakers_per_batch * utterances_per_speaker, 
+                                     speakers_per_batch))
+    ground_truth = np.repeat(np.arange(speakers_per_batch), utterances_per_speaker)
+    target = torch.from_numpy(ground_truth).long().to(self.loss_device)
+    loss = self.loss_fn(sim_matrix, target)
+    
+    # EER (not backpropagated)
+    with torch.no_grad():
+        inv_argmax = lambda i: np.eye(1, speakers_per_batch, i, dtype=np.int)[0]
+        labels = np.array([inv_argmax(i) for i in ground_truth])
+        preds = sim_matrix.detach().cpu().numpy()
 
-            # Snippet from https://yangcha.github.io/EER-ROC/
-            fpr, tpr, thresholds = roc_curve(labels.flatten(), preds.flatten())           
-            eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
-            
-        return loss, eer
+        # Snippet from https://yangcha.github.io/EER-ROC/
+        fpr, tpr, thresholds = roc_curve(labels.flatten(), preds.flatten())           
+        eer = brentq(lambda x: 1. - x - interp1d(fpr, tpr)(x), 0., 1.)
+        
+    return loss, eer
