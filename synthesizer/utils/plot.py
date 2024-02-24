@@ -11,33 +11,33 @@ def split_title_line(title_text, max_words=5):
 
 
 def plot_alignment(alignment, path, title=None, split_title=False, max_len=None):
-	import matplotlib
-	matplotlib.use("Agg")
-	import matplotlib.pyplot as plt
+    import matplotlib
+    matplotlib.use("Agg")
+    import matplotlib.pyplot as plt
 
-	if max_len is not None:
-		alignment = alignment[:, :max_len]
+    if max_len is not None:
+        alignment = alignment[:, :max_len]
 
-	fig = plt.figure(figsize=(8, 6))
-	ax = fig.add_subplot(111)
+    fig = plt.figure(figsize=(8, 6))
+    ax = fig.add_subplot(111)
 
-	im = ax.imshow(
-		alignment,
-		aspect="auto",
-		origin="lower",
-		interpolation="none")
-	fig.colorbar(im, ax=ax)
-	xlabel = "Decoder timestep"
+    im = ax.imshow(
+        alignment,
+        aspect="auto",
+        origin="upper",  # Flipping the y-axis
+        interpolation="none")
+    fig.colorbar(im, ax=ax)
+    xlabel = "Decoder timestep"
 
-	if split_title:
-		title = split_title_line(title)
+    if split_title:
+        title = split_title_line(title)
 
-	plt.xlabel(xlabel)
-	plt.title(title)
-	plt.ylabel("Encoder timestep")
-	plt.tight_layout()
-	plt.savefig(path, format="png")
-	plt.close()
+    plt.xlabel(xlabel)
+    plt.title(title)
+    plt.ylabel("Encoder timestep")
+    plt.tight_layout()
+    plt.savefig(path, format="png")
+    plt.close()
 
 
 def plot_spectrogram(pred_spectrogram, path, title=None, split_title=False, target_spectrogram=None, max_len=None, auto_aspect=False):
