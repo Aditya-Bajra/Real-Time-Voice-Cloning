@@ -240,6 +240,9 @@ def eval_model(attention, mel_prediction, target_spectrogram, input_seq, step,
     attention_path = str(plot_dir.joinpath("attention_step_{}_sample_{}".format(step, sample_num)))
     save_attention(attention, attention_path)
 
+    alignment_plot_path = str(plot_dir.joinpath("alignment_step_{}_sample_{}.png".format(step, sample_num)))
+    plot_alignment(attention, alignment_plot_path, title="Alignment Plot")
+
     # save predicted mel spectrogram to disk (debug)
     mel_output_fpath = mel_output_dir.joinpath("mel-prediction-step-{}_sample_{}.npy".format(step, sample_num))
     np.save(str(mel_output_fpath), mel_prediction, allow_pickle=False)
