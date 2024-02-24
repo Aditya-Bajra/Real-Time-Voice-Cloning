@@ -10,22 +10,20 @@ def split_title_line(title_text, max_words=5):
 	return "\n".join([" ".join(seq[i:i + max_words]) for i in range(0, len(seq), max_words)])
 
 
-def plot_alignment(alignment, path, title=None, split_title=False, max_len=None):
+def plot_alignment(alignment, path, title=None, split_title=False):
     import matplotlib
     matplotlib.use("Agg")
     import matplotlib.pyplot as plt
-
-    if max_len is not None:
-        alignment = alignment[:, :max_len]
 
     fig = plt.figure(figsize=(8, 6))
     ax = fig.add_subplot(111)
 
     im = ax.imshow(
-        alignment,
+        alignment[::-1],  # Reverse the alignment array to flip the y-axis
         aspect="auto",
-        origin="upper",  # Flipping the y-axis
-        interpolation="none")
+        origin="lower",   # Set origin to lower
+        interpolation="none",
+        extent=[0, alignment.shape[1], 0, alignment.shape[0]])  # Set the extent for the y-axis
     fig.colorbar(im, ax=ax)
     xlabel = "Decoder timestep"
 
@@ -38,6 +36,7 @@ def plot_alignment(alignment, path, title=None, split_title=False, max_len=None)
     plt.tight_layout()
     plt.savefig(path, format="png")
     plt.close()
+
 
 
 def plot_spectrogram(pred_spectrogram, path, title=None, split_title=False, target_spectrogram=None, max_len=None, auto_aspect=False):
